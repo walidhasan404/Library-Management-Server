@@ -43,30 +43,32 @@ async function run() {
     // await client.connect();
 
     const booksCollection = client.db('libraryBooks').collection('books');
-    const borrowBooksCollection = client.db('libraryBooks').collection('borrow')
+    const borrowBooksCollection = client.db('libraryBooks').collection('borrowedBooks');
     const addedBooksCollection = client.db('libraryBooks').collection('addedBooks');
 
     app.post('/jwt', async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
-      res.send({token})
+      res.send({ token })
     });
 
     const verifyToken = (req, res, next) => {
-      console.log(req.headers.authorization);
-      if (!req.headers.authorization) {
-        return res.status(401).send({ message: 'unauthorized access' });
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).send({ message: 'Unauthorized access' });
       }
-      const token = req.headers.authorization.split(' ')[1];
+      const token = authHeader.split(' ')[1];
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
         if (err) {
-          return res.status(401).send({ message: 'unauthorized access' });
+          return res.status(401).send({ message: 'Unauthorized access' });
         }
         req.decoded = decoded;
         next();
       });
-    }
-    
+    };
+
+
+
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
       const query = { email: email };
@@ -78,8 +80,8 @@ async function run() {
       next();
     }
 
-     // users
-     app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+    // users
+    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     })
@@ -192,22 +194,42 @@ async function run() {
     })
 
     // borrowed books
-    app.get('/borrow', verifyToken, logger, async (req, res) => {
-      if (req.query.email !== req.user.email) {
-        return res.status(403).send({ message: 'Forbidden Access' })
+    app.get('/borrow', verifyToken, async (req, res) => {
+      if (req.query.email !== req.decoded.email) {
+        return res.status(403).send({ message: 'Forbidden Access' });
       }
+
       let query = {};
       if (req.query?.email) {
-        query = { email: req.query.email }
+        query = { email: req.query.email };
       }
-      const result = await borrowBooksCollection.find(query).toArray();
-      res.send(result);
-    })
+
+      try {
+        const result = await borrowBooksCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching borrowed books:", error);
+        res.status(500).send("Internal server error");
+      }
+    });
+
 
     app.post('/book/:id', async (req, res) => {
       const book = req.body;
-      const result = await borrowBooksCollection.insertOne(book);
-      res.send(result);
+      const { email, _id } = book;
+    
+      try {
+        const alreadyBorrowed = await borrowBooksCollection.findOne({ email, _id });
+        if (alreadyBorrowed) {
+          return res.status(400).send({ message: 'You have already borrowed this book' });
+        }
+    
+        const result = await borrowBooksCollection.insertOne(book);
+        res.send(result);
+      } catch (error) {
+        console.error("Error borrowing book:", error);
+        res.status(500).send("Internal server error");
+      }
     });
 
     app.patch('/book/:id', async (req, res) => {
