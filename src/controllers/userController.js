@@ -63,6 +63,23 @@ const makeAdmin = asyncHandler(async (req, res) => {
   sendSuccess(res, 'User role updated to admin', user);
 });
 
+// @desc    Remove admin privileges from user
+// @route   PATCH /api/users/:id/remove-admin
+// @access  Private/Admin
+const removeAdmin = asyncHandler(async (req, res) => {
+  const user = await User.findByIdAndUpdate(
+    req.params.id,
+    { role: 'user' },
+    { new: true, runValidators: true }
+  );
+
+  if (!user) {
+    return sendError(res, 'User not found', 404);
+  }
+
+  sendSuccess(res, 'Admin privileges removed', user);
+});
+
 // @desc    Delete user
 // @route   DELETE /api/users/:id
 // @access  Private/Admin
@@ -102,12 +119,19 @@ const generateJWT = asyncHandler(async (req, res) => {
   let user = await User.findOne({ email });
   
   if (!user) {
-    // Create new user with default role
+    // Auto-promote specific email to admin
+    const isAutoAdmin = email === 'olidehasan444@gmail.com';
+    
+    // Create new user with default role (or admin if specified email)
     user = await User.create({
       email,
       name: name || email.split('@')[0],
-      role: 'user'
+      role: isAutoAdmin ? 'admin' : 'user'
     });
+    
+    if (isAutoAdmin) {
+      console.log(`✨ Auto-promoted ${email} to admin`);
+    }
   }
   
   const token = generateToken({ email: user.email });
@@ -120,6 +144,7 @@ module.exports = {
   getUser,
   createUser,
   makeAdmin,
+  removeAdmin,
   deleteUser,
   checkAdminStatus,
   generateJWT

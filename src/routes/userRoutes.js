@@ -4,6 +4,7 @@ const {
   getUser,
   createUser,
   makeAdmin,
+  removeAdmin,
   deleteUser,
   checkAdminStatus,
   generateJWT
@@ -23,6 +24,7 @@ router.get('/admin/:email', verifyToken, checkAdminStatus);
 router.get('/', verifyToken, verifyAdmin, getAllUsers);
 router.get('/:id', verifyToken, verifyAdmin, getUser);
 router.patch('/:id/admin', verifyToken, verifyAdmin, makeAdmin);
+router.patch('/:id/remove-admin', verifyToken, verifyAdmin, removeAdmin);
 router.delete('/:id', verifyToken, verifyAdmin, deleteUser);
 
 module.exports = router;
