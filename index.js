@@ -1,302 +1,78 @@
-const express = require('express');
 require('dotenv').config();
-const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const app = express();
+const dbConnection = require('./src/config/db');
+const app = require('./src/app');
+
 const port = process.env.PORT || 5000;
 
-// Middlewares
-app.use(cors({
-  origin: ['http://localhost:5173',
-    "https://library-management-86cd6.web.app",
-    "https://library-management-86cd6.firebaseapp.com"
-  ],
-  credentials: true
-}));
-app.use(express.json());
-app.use(cookieParser());
 
-
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.s2dzxgz.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
-});
-
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-};
-
-
-async function run() {
+const startServer = async () => {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
-    // await client.connect();
-
-    const booksCollection = client.db('libraryBooks').collection('books');
-    const borrowBooksCollection = client.db('libraryBooks').collection('borrowedBooks');
-    const addedBooksCollection = client.db('libraryBooks').collection('addedBooks');
-
-    app.post('/jwt', async (req, res) => {
-      const user = req.body;
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
-      res.send({ token })
+    console.log('🚀 Starting Library Management API...');
+    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    
+    // Connect to database first
+    console.log('📦 Connecting to database...');
+    await dbConnection.connect();
+    
+    // Start the server only after database connection is established
+    const server = app.listen(port, () => {
+      console.log('🎉 Server started successfully!');
+      console.log(`📡 API running on: http://localhost:${port}`);
+      console.log(`📊 Database: ${dbConnection.getConnectionStatus().host}`);
+      console.log('📚 Library Management API is ready to serve requests!');
+      console.log('🔗 Health check: http://localhost:' + port);
+      console.log('🔗 API docs: http://localhost:' + port + '/api');
     });
 
-    const verifyToken = (req, res, next) => {
-      const authHeader = req.headers.authorization;
-      if (!authHeader) {
-        return res.status(401).send({ message: 'Unauthorized access' });
+    // Handle server errors
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is already in use`);
+        console.error('💡 Try using a different port or kill the process using this port');
+      } else {
+        console.error('❌ Server error:', error);
       }
-      const token = authHeader.split(' ')[1];
-      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-        if (err) {
-          return res.status(401).send({ message: 'Unauthorized access' });
+      process.exit(1);
+    });
+
+    // Graceful shutdown handling
+    const gracefulShutdown = async (signal) => {
+      console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
+      
+      server.close(async () => {
+        console.log('🔌 HTTP server closed');
+        
+        try {
+          await dbConnection.disconnect();
+          console.log('📦 Database connection closed');
+          console.log('✅ Graceful shutdown completed');
+          process.exit(0);
+        } catch (error) {
+          console.error('❌ Error during shutdown:', error);
+          process.exit(1);
         }
-        req.decoded = decoded;
-        next();
       });
     };
 
+    // Handle process termination signals
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-
-    const verifyAdmin = async (req, res, next) => {
-      const email = req.decoded.email;
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      const isAdmin = user?.role === 'admin';
-      if (!isAdmin) {
-        return res.status(403).send({ message: 'forbidden access' });
-      }
-      next();
-    }
-
-    // users
-    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
-      const result = await usersCollection.find().toArray();
-      res.send(result);
-    })
-
-    app.get('/users/admin/:email', verifyToken, async (req, res) => {
-      const email = req.params.email;
-      if (email !== req.decoded.email) {
-        return res.status(403).send({ message: 'forbidden access' })
-      }
-
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      let admin = false;
-      if (user) {
-        admin = user?.role === 'admin';
-      }
-      res.send({ admin });
-    })
-
-    app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: 'admin'
-        }
-      }
-      const result = await usersCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    })
-
-    app.post('/users', async (req, res) => {
-      const user = req.body;
-      const query = { email: user.email }
-      const existingUser = await usersCollection.findOne(query);
-      if (existingUser) {
-        return res.send({ message: 'user already exists', insertedId: null })
-      }
-      const result = await usersCollection.insertOne(user);
-      res.send(result);
-    })
-
-    app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await usersCollection.deleteOne(query);
-      res.send(result);
-    })
-    //clearing Token
-    // app.post("/logout", async (req, res) => {
-    //   const user = req.body;
-    //   console.log("logging out", user);
-    //   res
-    //     .clearCookie("token", { ...cookieOptions, maxAge: 0 })
-    //     .send({ success: true });
-    // });
-
-    app.get('/books', async (req, res) => {
-      const cursor = booksCollection.find();
-      const result = await cursor.toArray();
-      res.send(result);
-
-    })
-
-
-    app.get('/books/:category', async (req, res) => {
-      try {
-        const category = req.params.category;
-        const query = { category: category };
-        const cursor = booksCollection.find(query);
-        const result = await cursor.toArray();
-        res.send(result);
-      } catch (error) {
-        console.error("Error fetching books by category:", error);
-        res.status(500).send("Internal server error");
-      }
-    })
-
-    app.get('/book/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await booksCollection.findOne(query);
-      res.send(result);
-    })
-    app.delete('/delete/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await borrowBooksCollection.deleteOne(query);
-      res.send(result);
-    })
-
-
-    app.put('/book/:id', async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) }
-      const options = { upsert: true };
-      const updatedBook = req.body;
-      const book = {
-        $set: {
-          image: updatedBook.image,
-          name: updatedBook.name,
-          author_name: updatedBook.author_name,
-          category: updatedBook.category,
-          rating: updatedBook.rating
-        }
-      }
-
-      const result = await booksCollection.updateOne(filter, book, options);
-      res.send(result);
-    })
-
-    // borrowed books
-    app.get('/borrow', verifyToken, async (req, res) => {
-      if (req.query.email !== req.decoded.email) {
-        return res.status(403).send({ message: 'Forbidden Access' });
-      }
-
-      let query = {};
-      if (req.query?.email) {
-        query = { email: req.query.email };
-      }
-
-      try {
-        const result = await borrowBooksCollection.find(query).toArray();
-        res.send(result);
-      } catch (error) {
-        console.error("Error fetching borrowed books:", error);
-        res.status(500).send("Internal server error");
-      }
-    });
-
-
-    app.post('/book/:id', async (req, res) => {
-      const book = req.body;
-      const { email, _id } = book;
-    
-      try {
-        const alreadyBorrowed = await borrowBooksCollection.findOne({ email, _id });
-        if (alreadyBorrowed) {
-          return res.status(400).send({ message: 'You have already borrowed this book' });
-        }
-    
-        const result = await borrowBooksCollection.insertOne(book);
-        res.send(result);
-      } catch (error) {
-        console.error("Error borrowing book:", error);
-        res.status(500).send("Internal server error");
-      }
-    });
-
-    app.patch('/book/:id', async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updateBook = req.body;
-      console.log(updateBook);
-      const updateDoc = {
-        $set: {
-          status: updateBook.status
-        },
-      };
-      const result = await borrowBooksCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    })
-
-
-
-
-    // For Added Books
-
-    // app.get('/added', async (req, res) => {
-    //   const cursor = addedBooksCollection.find();
-    //   const result = await cursor.toArray();
-    //   res.send(result);
-    // })
-
-    app.get('/added', async (req, res) => {
-      let query = {};
-      if (req.query?.email) {
-        query = { email: req.query.email }
-      }
-      try {
-        const result = await addedBooksCollection.find(query).toArray();
-        res.send(result);
-      } catch (error) {
-        console.error("Error fetching added books:", error);
-        res.status(500).send("Internal server error");
-      }
-    })
-
-    app.post('/added/:id', async (req, res) => {
-      const newBook = req.body;
-      try {
-        const result = await addedBooksCollection.insertOne(newBook);
-        res.send(result);
-      } catch (error) {
-        console.error("Error adding new book:", error);
-        res.status(500).send("Internal server error");
-      }
-    })
-
-    // Send a ping to confirm a successful connection
-    //  await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    console.error('💡 Check your environment variables and database connection');
+    process.exit(1);
   }
+};
+
+// ========================================
+// START APPLICATION
+// ========================================
+
+// Only start if this file is run directly (not imported)
+if (require.main === module) {
+  startServer();
 }
-run().catch(console.dir);
 
-
-app.get('/', (req, res) => {
-  res.send('Librarian is running')
-})
-
-app.listen(port, () => {
-  console.log(`Librarian is running on port: ${port}`);
-})
+// Export for testing
+module.exports = { app, startServer };
