@@ -18,7 +18,7 @@ router.get('/search', searchBooks);
 router.get('/category/:category', getBooksByCategory);
 router.get('/:id', getBook);
 
-// Private routes (authenticated users only)
+// Private routes (authenticated users only) - No admin restriction
 router.post('/', verifyToken, createBook);
 router.put('/:id', verifyToken, updateBook);
 router.delete('/:id', verifyToken, deleteBook);
