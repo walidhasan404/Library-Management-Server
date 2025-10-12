@@ -96,8 +96,21 @@ const checkAdminStatus = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/jwt
 // @access  Public
 const generateJWT = asyncHandler(async (req, res) => {
-  const user = req.body;
-  const token = generateToken(user);
+  const { email, name } = req.body;
+  
+  // Check if user exists, if not create one
+  let user = await User.findOne({ email });
+  
+  if (!user) {
+    // Create new user with default role
+    user = await User.create({
+      email,
+      name: name || email.split('@')[0],
+      role: 'user'
+    });
+  }
+  
+  const token = generateToken({ email: user.email });
   
   sendSuccess(res, 'Token generated successfully', { token });
 });
