@@ -16,9 +16,9 @@ router.get('/', verifyToken, getBorrowedBooks);
 router.post('/', verifyToken, borrowBook);
 router.patch('/:id/return', verifyToken, returnBook);
 
-// Admin only routes
-router.get('/all', verifyToken, verifyAdmin, getAllBorrowedBooks);
-router.patch('/:id', verifyToken, verifyAdmin, updateBorrowedBookStatus);
-router.delete('/:id', verifyToken, verifyAdmin, deleteBorrowedBook);
+// Private routes (authenticated users only)
+router.get('/all', verifyToken, getAllBorrowedBooks);
+router.patch('/:id', verifyToken, updateBorrowedBookStatus);
+router.delete('/:id', verifyToken, deleteBorrowedBook);
 
 module.exports = router;

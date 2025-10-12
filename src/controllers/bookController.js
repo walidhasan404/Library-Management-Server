@@ -35,7 +35,7 @@ const getBook = asyncHandler(async (req, res) => {
 
 // @desc    Create new book
 // @route   POST /api/books
-// @access  Private/Admin
+// @access  Private
 const createBook = asyncHandler(async (req, res) => {
   const book = await Book.create(req.body);
   
@@ -44,7 +44,7 @@ const createBook = asyncHandler(async (req, res) => {
 
 // @desc    Update book
 // @route   PUT /api/books/:id
-// @access  Private/Admin
+// @access  Private
 const updateBook = asyncHandler(async (req, res) => {
   const book = await Book.findByIdAndUpdate(
     req.params.id,
@@ -61,7 +61,7 @@ const updateBook = asyncHandler(async (req, res) => {
 
 // @desc    Delete book
 // @route   DELETE /api/books/:id
-// @access  Private/Admin
+// @access  Private
 const deleteBook = asyncHandler(async (req, res) => {
   const book = await Book.findByIdAndDelete(req.params.id);
 

@@ -119,19 +119,12 @@ const generateJWT = asyncHandler(async (req, res) => {
   let user = await User.findOne({ email });
   
   if (!user) {
-    // Auto-promote specific email to admin
-    const isAutoAdmin = email === 'olidehasan444@gmail.com';
-    
-    // Create new user with default role (or admin if specified email)
+    // Create new user with default role
     user = await User.create({
       email,
       name: name || email.split('@')[0],
-      role: isAutoAdmin ? 'admin' : 'user'
+      role: 'user'
     });
-    
-    if (isAutoAdmin) {
-      console.log(`✨ Auto-promoted ${email} to admin`);
-    }
   }
   
   const token = generateToken({ email: user.email });

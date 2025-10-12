@@ -21,9 +21,9 @@ const getBorrowedBooks = asyncHandler(async (req, res) => {
   sendSuccess(res, 'Borrowed books retrieved successfully', borrowedBooks);
 });
 
-// @desc    Get all borrowed books (Admin only)
+// @desc    Get all borrowed books
 // @route   GET /api/borrowed/all
-// @access  Private/Admin
+// @access  Private
 const getAllBorrowedBooks = asyncHandler(async (req, res) => {
   const borrowedBooks = await BorrowedBook.find()
     .populate('book', 'name author_name category image')
@@ -104,9 +104,9 @@ const returnBook = asyncHandler(async (req, res) => {
   sendSuccess(res, 'Book returned successfully', borrowedBook);
 });
 
-// @desc    Update borrowed book status (Admin only)
+// @desc    Update borrowed book status
 // @route   PATCH /api/borrowed/:id
-// @access  Private/Admin
+// @access  Private
 const updateBorrowedBookStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
   
@@ -125,7 +125,7 @@ const updateBorrowedBookStatus = asyncHandler(async (req, res) => {
 
 // @desc    Delete borrowed book record
 // @route   DELETE /api/borrowed/:id
-// @access  Private/Admin
+// @access  Private
 const deleteBorrowedBook = asyncHandler(async (req, res) => {
   const borrowedBook = await BorrowedBook.findByIdAndDelete(req.params.id);
 

@@ -18,9 +18,9 @@ router.get('/search', searchBooks);
 router.get('/category/:category', getBooksByCategory);
 router.get('/:id', getBook);
 
-// Admin only routes
-router.post('/', verifyToken, verifyAdmin, createBook);
-router.put('/:id', verifyToken, verifyAdmin, updateBook);
-router.delete('/:id', verifyToken, verifyAdmin, deleteBook);
+// Private routes (authenticated users only)
+router.post('/', verifyToken, createBook);
+router.put('/:id', verifyToken, updateBook);
+router.delete('/:id', verifyToken, deleteBook);
 
 module.exports = router;
