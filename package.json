@@ -7,10 +7,11 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node index.js",
     "dev": "nodemon index.js",
     "build": "echo 'No build step required'",
     "vercel-build": "echo 'Vercel build completed'",
+    "make-admin": "node scripts/make-admin.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix"
