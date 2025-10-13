@@ -127,7 +127,10 @@ const generateJWT = asyncHandler(async (req, res) => {
     });
   }
   
-  const token = generateToken({ email: user.email });
+  const token = generateToken({ 
+    _id: user._id,
+    email: user.email 
+  });
   
   sendSuccess(res, 'Token generated successfully', { token });
 });
