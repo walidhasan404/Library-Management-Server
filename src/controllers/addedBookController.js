@@ -35,11 +35,15 @@ const getAllAddedBooks = asyncHandler(async (req, res) => {
 // @route   POST /api/added
 // @access  Private
 const addBook = asyncHandler(async (req, res) => {
+  const mongoose = require('mongoose');
+  
   const bookData = {
     ...req.body,
-    user: req.user._id,
+    user: new mongoose.Types.ObjectId(req.user._id),
     email: req.user.email
   };
+
+  console.log('Creating book with data:', bookData);
 
   const addedBook = await AddedBook.create(bookData);
 
@@ -92,7 +96,7 @@ const deleteAddedBook = asyncHandler(async (req, res) => {
   }
 
   // Check if user owns this added book or is admin
-  if (addedBook.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+  if (addedBook.user.toString() !== new mongoose.Types.ObjectId(req.user._id).toString() && req.user.role !== 'admin') {
     return sendError(res, 'Forbidden access', 403);
   }
 

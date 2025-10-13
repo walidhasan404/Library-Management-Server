@@ -50,9 +50,11 @@ const borrowBook = asyncHandler(async (req, res) => {
     return sendError(res, 'Book is not available for borrowing', 400);
   }
 
+  const mongoose = require('mongoose');
+  
   // Check if user has already borrowed this book
   const existingBorrow = await BorrowedBook.findOne({ 
-    user: req.user._id, 
+    user: new mongoose.Types.ObjectId(req.user._id), 
     book: bookId,
     status: 'borrowed'
   });
@@ -63,7 +65,7 @@ const borrowBook = asyncHandler(async (req, res) => {
 
   // Create borrowed book record
   const borrowedBook = await BorrowedBook.create({
-    user: req.user._id,
+    user: new mongoose.Types.ObjectId(req.user._id),
     book: bookId,
     email,
     bookName: book.name,
@@ -90,7 +92,7 @@ const returnBook = asyncHandler(async (req, res) => {
   }
 
   // Check if user owns this borrowed book
-  if (borrowedBook.user.toString() !== req.user._id.toString()) {
+  if (borrowedBook.user.toString() !== new mongoose.Types.ObjectId(req.user._id).toString()) {
     return sendError(res, 'Forbidden access', 403);
   }
 
