@@ -17,12 +17,12 @@ const router = express.Router();
 router.post('/auth/jwt', generateJWT);
 router.post('/', createUser);
 
-// Protected routes
+// Protected routes (all authenticated users)
 router.get('/admin/:email', verifyToken, checkAdminStatus);
+router.get('/', verifyToken, getAllUsers);
+router.get('/:id', verifyToken, getUser);
 
 // Admin only routes
-router.get('/', verifyToken, verifyAdmin, getAllUsers);
-router.get('/:id', verifyToken, verifyAdmin, getUser);
 router.patch('/:id/admin', verifyToken, verifyAdmin, makeAdmin);
 router.patch('/:id/remove-admin', verifyToken, verifyAdmin, removeAdmin);
 router.delete('/:id', verifyToken, verifyAdmin, deleteUser);
