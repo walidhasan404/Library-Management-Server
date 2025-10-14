@@ -37,7 +37,7 @@ const getAllBorrowedBooks = asyncHandler(async (req, res) => {
 // @route   POST /api/borrowed
 // @access  Private
 const borrowBook = asyncHandler(async (req, res) => {
-  const { bookId, email, returnDate } = req.body;
+  const { bookId, email, returnDate, bookName, authorName, category, image } = req.body;
 
   // Check if book exists
   const book = await Book.findById(bookId);
@@ -63,15 +63,15 @@ const borrowBook = asyncHandler(async (req, res) => {
     return sendError(res, 'You have already borrowed this book', 400);
   }
 
-  // Create borrowed book record
+  // Create borrowed book record using data from request body (sent by frontend)
   const borrowedBook = await BorrowedBook.create({
     user: new mongoose.Types.ObjectId(req.user._id),
     book: bookId,
     email,
-    bookName: book.name,
-    authorName: book.author_name,
-    category: book.category,
-    image: book.image,
+    bookName: bookName || book.name,
+    authorName: authorName || book.author_name,
+    category: category || book.category,
+    image: image || book.image,
     returnDate: new Date(returnDate)
   });
 
