@@ -22,9 +22,9 @@ router.get('/admin/:email', verifyToken, checkAdminStatus);
 router.get('/', verifyToken, getAllUsers);
 router.get('/:id', verifyToken, getUser);
 
-// Admin only routes
-router.patch('/:id/admin', verifyToken, verifyAdmin, makeAdmin);
-router.patch('/:id/remove-admin', verifyToken, verifyAdmin, removeAdmin);
-router.delete('/:id', verifyToken, verifyAdmin, deleteUser);
+// User management routes (authenticated users can manage)
+router.patch('/:id/admin', verifyToken, makeAdmin);
+router.patch('/:id/remove-admin', verifyToken, removeAdmin);
+router.delete('/:id', verifyToken, deleteUser);
 
 module.exports = router;
