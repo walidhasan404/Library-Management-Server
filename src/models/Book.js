@@ -11,9 +11,22 @@ const bookSchema = new mongoose.Schema({
     required: [true, 'Author name is required'],
     trim: true
   },
+  author: {
+    type: String,
+    trim: true
+  },
   category: {
     type: String,
     required: [true, 'Category is required'],
+    trim: true
+  },
+  quantity: {
+    type: Number,
+    default: 1,
+    min: 0
+  },
+  shortDescription: {
+    type: String,
     trim: true
   },
   image: {

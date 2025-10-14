@@ -2,12 +2,44 @@ const Book = require('../models/Book');
 const asyncHandler = require('../middlewares/asyncHandler');
 const { sendSuccess, sendError } = require('../utils/response');
 
-// @desc    Get all books
-// @route   GET /api/books
+// @desc    Get all books with pagination
+// @route   GET /api/books?page=1&limit=9
 // @access  Public
 const getAllBooks = asyncHandler(async (req, res) => {
-  const books = await Book.find().select('-__v');
-  sendSuccess(res, 'Books retrieved successfully', books);
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 9;
+  const startIndex = (page - 1) * limit;
+
+  // Get total count for pagination info
+  const total = await Book.countDocuments();
+
+  // Get books with pagination
+  const books = await Book.find()
+    .select('-__v')
+    .limit(limit)
+    .skip(startIndex)
+    .sort({ createdAt: -1 }); // Sort by newest first
+
+  // Calculate pagination info
+  const totalPages = Math.ceil(total / limit);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
+
+  const paginationInfo = {
+    currentPage: page,
+    totalPages,
+    totalBooks: total,
+    booksPerPage: limit,
+    hasNextPage,
+    hasPrevPage,
+    nextPage: hasNextPage ? page + 1 : null,
+    prevPage: hasPrevPage ? page - 1 : null
+  };
+
+  sendSuccess(res, 'Books retrieved successfully', {
+    books,
+    pagination: paginationInfo
+  });
 });
 
 // @desc    Get books by category
