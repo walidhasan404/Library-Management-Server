@@ -37,7 +37,7 @@ const getAllBorrowedBooks = asyncHandler(async (req, res) => {
 // @route   POST /api/borrowed
 // @access  Private
 const borrowBook = asyncHandler(async (req, res) => {
-  const { bookId, email, returnDate, bookName, authorName, category, image } = req.body;
+  const { bookId, email, returnDate, bookName, authorName, category, image, userName } = req.body;
 
   // Check if book exists
   const book = await Book.findById(bookId);
@@ -68,6 +68,7 @@ const borrowBook = asyncHandler(async (req, res) => {
     user: new mongoose.Types.ObjectId(req.user._id),
     book: bookId,
     email,
+    userName: userName || req.user.name || email,
     bookName: bookName || book.name,
     authorName: authorName || book.author_name,
     category: category || book.category,

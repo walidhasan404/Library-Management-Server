@@ -17,6 +17,10 @@ const borrowedBookSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
+  userName: {
+    type: String,
+    trim: true
+  },
   bookName: {
     type: String,
     required: [true, 'Book name is required']
