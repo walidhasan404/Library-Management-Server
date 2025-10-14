@@ -4,6 +4,7 @@ const {
   getAllBorrowedBooks,
   borrowBook,
   returnBook,
+  updateReturnDate,
   updateBorrowedBookStatus,
   deleteBorrowedBook
 } = require('../controllers/borrowedBookController');
@@ -15,6 +16,7 @@ const router = express.Router();
 router.get('/', verifyToken, getBorrowedBooks);
 router.post('/', verifyToken, borrowBook);
 router.patch('/:id/return', verifyToken, returnBook);
+router.patch('/:id/return-date', verifyToken, updateReturnDate);
 
 // Private routes (authenticated users only)
 router.get('/all', verifyToken, getAllBorrowedBooks);

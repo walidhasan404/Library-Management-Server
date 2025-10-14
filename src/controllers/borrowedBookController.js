@@ -107,6 +107,50 @@ const returnBook = asyncHandler(async (req, res) => {
   sendSuccess(res, 'Book returned successfully', borrowedBook);
 });
 
+// @desc    Update return date
+// @route   PATCH /api/borrowed/:id/return-date
+// @access  Private
+const updateReturnDate = asyncHandler(async (req, res) => {
+  const { returnDate } = req.body;
+  const mongoose = require('mongoose');
+  
+  const borrowedBook = await BorrowedBook.findById(req.params.id);
+
+  if (!borrowedBook) {
+    return sendError(res, 'Borrowed book record not found', 404);
+  }
+
+  // Check if user owns this borrowed book
+  if (borrowedBook.user.toString() !== new mongoose.Types.ObjectId(req.user._id).toString()) {
+    return sendError(res, 'Forbidden access', 403);
+  }
+
+  // Check if edit limit reached
+  if (borrowedBook.returnDateEditCount >= 2) {
+    return sendError(res, 'Return date can only be edited 2 times', 400);
+  }
+
+  // Validate return date (max 1 month from now)
+  const newReturnDate = new Date(returnDate);
+  const maxReturnDate = new Date();
+  maxReturnDate.setMonth(maxReturnDate.getMonth() + 1);
+
+  if (newReturnDate > maxReturnDate) {
+    return sendError(res, 'Return date cannot be more than 1 month from today', 400);
+  }
+
+  if (newReturnDate < new Date()) {
+    return sendError(res, 'Return date cannot be in the past', 400);
+  }
+
+  // Update return date and increment edit count
+  borrowedBook.returnDate = newReturnDate;
+  borrowedBook.returnDateEditCount += 1;
+  await borrowedBook.save();
+
+  sendSuccess(res, 'Return date updated successfully', borrowedBook);
+});
+
 // @desc    Update borrowed book status
 // @route   PATCH /api/borrowed/:id
 // @access  Private
@@ -144,6 +188,7 @@ module.exports = {
   getAllBorrowedBooks,
   borrowBook,
   returnBook,
+  updateReturnDate,
   updateBorrowedBookStatus,
   deleteBorrowedBook
 };

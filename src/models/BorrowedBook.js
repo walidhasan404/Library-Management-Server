@@ -45,6 +45,11 @@ const borrowedBookSchema = new mongoose.Schema({
     type: Date,
     required: [true, 'Return date is required']
   },
+  returnDateEditCount: {
+    type: Number,
+    default: 0,
+    max: 2
+  },
   status: {
     type: String,
     enum: ['borrowed', 'returned', 'overdue'],
