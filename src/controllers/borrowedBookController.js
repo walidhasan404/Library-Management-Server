@@ -2,8 +2,9 @@ const BorrowedBook = require('../models/BorrowedBook');
 const Book = require('../models/Book');
 const asyncHandler = require('../middlewares/asyncHandler');
 const { sendSuccess, sendError } = require('../utils/response');
+const mongoose = require('mongoose');
 
-// @desc    Get borrowed books for a user
+// @desc    Get borrowed books for a user (only borrowed and pending, not returned)
 // @route   GET /api/borrowed
 // @access  Private
 const getBorrowedBooks = asyncHandler(async (req, res) => {
@@ -13,12 +14,37 @@ const getBorrowedBooks = asyncHandler(async (req, res) => {
     return sendError(res, 'Forbidden access', 403);
   }
 
-  const borrowedBooks = await BorrowedBook.find({ email })
+  // Check for status filter in query params
+  const { status } = req.query;
+  
+  let statusFilter = { $in: ['borrowed', 'return_pending'] };
+  if (status) {
+    statusFilter = status; // Allow filtering by status
+  }
+
+  const borrowedBooks = await BorrowedBook.find({ 
+    email,
+    ...(status ? { status } : { status: { $in: ['borrowed', 'return_pending'] } })
+  })
     .populate('book', 'name author_name category image')
     .populate('user', 'name email')
-    .select('-__v');
+    .select('-__v')
+    .sort({ createdAt: -1 });
 
   sendSuccess(res, 'Borrowed books retrieved successfully', borrowedBooks);
+});
+
+// @desc    Get all pending return requests (Admin only)
+// @route   GET /api/borrowed/pending
+// @access  Private (Admin only)
+const getPendingReturns = asyncHandler(async (req, res) => {
+  const pendingReturns = await BorrowedBook.find({ status: 'return_pending' })
+    .populate('book', 'name author_name category image quantity')
+    .populate('user', 'name email')
+    .select('-__v')
+    .sort({ returnRequestDate: -1 });
+
+  sendSuccess(res, 'Pending returns retrieved successfully', pendingReturns);
 });
 
 // @desc    Get all borrowed books
@@ -45,22 +71,24 @@ const borrowBook = asyncHandler(async (req, res) => {
     return sendError(res, 'Book not found', 404);
   }
 
-  // Check if book is available
-  if (!book.available) {
+  // Check if book is available by stock (quantity)
+  if (typeof book.quantity !== 'number' || book.quantity <= 0) {
     return sendError(res, 'Book is not available for borrowing', 400);
   }
+  // Auto-heal legacy flag if quantity > 0 but available is false
+  if (book.available === false && book.quantity > 0) {
+    await Book.findByIdAndUpdate(bookId, { available: true });
+  }
 
-  const mongoose = require('mongoose');
-  
-  // Check if user has already borrowed this book
+  // Check if user has already borrowed this book (including pending returns)
   const existingBorrow = await BorrowedBook.findOne({ 
     user: new mongoose.Types.ObjectId(req.user._id), 
     book: bookId,
-    status: 'borrowed'
+    status: { $in: ['borrowed', 'return_pending'] }
   });
 
   if (existingBorrow) {
-    return sendError(res, 'You have already borrowed this book', 400);
+    return sendError(res, 'You have already borrowed this book or it is pending return', 400);
   }
 
   // Create borrowed book record using data from request body (sent by frontend)
@@ -76,13 +104,19 @@ const borrowBook = asyncHandler(async (req, res) => {
     returnDate: new Date(returnDate)
   });
 
-  // Update book availability
-  await Book.findByIdAndUpdate(bookId, { available: false });
+  // Decrease book quantity by 1
+  await Book.findByIdAndUpdate(bookId, { $inc: { quantity: -1 } });
+  
+  // Update availability if quantity reaches 0
+  const updatedBook = await Book.findById(bookId);
+  if (updatedBook.quantity === 0) {
+    await Book.findByIdAndUpdate(bookId, { available: false });
+  }
 
   sendSuccess(res, 'Book borrowed successfully', borrowedBook, 201);
 });
 
-// @desc    Return a book
+// @desc    Request to return a book (user action)
 // @route   PATCH /api/borrowed/:id/return
 // @access  Private
 const returnBook = asyncHandler(async (req, res) => {
@@ -93,18 +127,21 @@ const returnBook = asyncHandler(async (req, res) => {
   }
 
   // Check if user owns this borrowed book
-  if (borrowedBook.user.toString() !== new mongoose.Types.ObjectId(req.user._id).toString()) {
+  if (borrowedBook.user.toString() !== req.user._id.toString()) {
     return sendError(res, 'Forbidden access', 403);
   }
 
-  // Update borrowed book status
-  borrowedBook.status = 'returned';
+  // Check if already pending return
+  if (borrowedBook.status === 'return_pending') {
+    return sendError(res, 'Return request already pending', 400);
+  }
+
+  // Update borrowed book status to pending
+  borrowedBook.status = 'return_pending';
+  borrowedBook.returnRequestDate = new Date();
   await borrowedBook.save();
 
-  // Update book availability
-  await Book.findByIdAndUpdate(borrowedBook.book, { available: true });
-
-  sendSuccess(res, 'Book returned successfully', borrowedBook);
+  sendSuccess(res, 'Return request submitted. Waiting for admin confirmation.', borrowedBook);
 });
 
 // @desc    Update return date
@@ -112,7 +149,6 @@ const returnBook = asyncHandler(async (req, res) => {
 // @access  Private
 const updateReturnDate = asyncHandler(async (req, res) => {
   const { returnDate } = req.body;
-  const mongoose = require('mongoose');
   
   const borrowedBook = await BorrowedBook.findById(req.params.id);
 
@@ -121,7 +157,7 @@ const updateReturnDate = asyncHandler(async (req, res) => {
   }
 
   // Check if user owns this borrowed book
-  if (borrowedBook.user.toString() !== new mongoose.Types.ObjectId(req.user._id).toString()) {
+  if (borrowedBook.user.toString() !== req.user._id.toString()) {
     return sendError(res, 'Forbidden access', 403);
   }
 
@@ -151,21 +187,35 @@ const updateReturnDate = asyncHandler(async (req, res) => {
   sendSuccess(res, 'Return date updated successfully', borrowedBook);
 });
 
-// @desc    Update borrowed book status
+// @desc    Update borrowed book status (admin only for confirming returns)
 // @route   PATCH /api/borrowed/:id
-// @access  Private
+// @access  Private (Admin only)
 const updateBorrowedBookStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
+  const borrowedBook = await BorrowedBook.findById(req.params.id);
   
-  const borrowedBook = await BorrowedBook.findByIdAndUpdate(
-    req.params.id,
-    { status },
-    { new: true, runValidators: true }
-  );
-
   if (!borrowedBook) {
     return sendError(res, 'Borrowed book record not found', 404);
   }
+
+  // If admin confirms a return
+  if (status === 'returned' && borrowedBook.status === 'return_pending') {
+    // Increase book quantity by 1
+    await Book.findByIdAndUpdate(borrowedBook.book, { $inc: { quantity: 1 } });
+    
+    // Update availability if quantity becomes greater than 0
+    const updatedBook = await Book.findById(borrowedBook.book);
+    if (updatedBook.quantity > 0) {
+      await Book.findByIdAndUpdate(borrowedBook.book, { available: true });
+    }
+  }
+
+  // Update the status
+  borrowedBook.status = status;
+  if (status === 'returned') {
+    borrowedBook.returnRequestDate = undefined;
+  }
+  await borrowedBook.save();
 
   sendSuccess(res, 'Borrowed book status updated successfully', borrowedBook);
 });
@@ -190,5 +240,6 @@ module.exports = {
   returnBook,
   updateReturnDate,
   updateBorrowedBookStatus,
-  deleteBorrowedBook
+  deleteBorrowedBook,
+  getPendingReturns
 };

@@ -37,6 +37,12 @@ const borrowedBookSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Book image is required']
   },
+  rating: {
+    type: Number,
+    min: 0,
+    max: 5,
+    default: 0
+  },
   borrowDate: {
     type: Date,
     default: Date.now
@@ -52,8 +58,11 @@ const borrowedBookSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['borrowed', 'returned', 'overdue'],
+    enum: ['borrowed', 'returned', 'overdue', 'return_pending'],
     default: 'borrowed'
+  },
+  returnRequestDate: {
+    type: Date
   },
   fine: {
     type: Number,
